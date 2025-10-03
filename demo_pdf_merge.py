@@ -107,7 +107,10 @@ def main():
             print(f"📁 Found {len(pdf_files)} PDFs to merge")
             
             # Merge PDFs
-            merger = PyPDF2.PdfFileMerger()
+            try:
+                merger = PyPDF2.PdfMerger()  # New version
+            except AttributeError:
+                merger = PyPDF2.PdfFileMerger()  # Fallback for older versions
             for pdf_file in sorted(pdf_files):
                 merger.append(str(pdf_file))
                 print(f"📄 Added: {pdf_file.name}")

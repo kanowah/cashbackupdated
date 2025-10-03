@@ -8,6 +8,433 @@ import time
 from pathlib import Path
 from io import BytesIO
 
+# Environment detection and path setup
+def get_base_paths():
+    """Get appropriate paths based on environment"""
+    if os.path.exists("/var/www/cashback"):
+        # VPS/Linux environment
+        base_path = Path("/var/www/cashback")
+        storage_path = base_path / "storage"
+        temp_path = base_path / "temp"
+    else:
+        # Local/Windows environment
+        base_path = Path(".")
+        storage_path = base_path / "storage"
+        temp_path = base_path / "temp"
+    
+    # Create directories if they don't exist
+    storage_path.mkdir(exist_ok=True)
+    temp_path.mkdir(exist_ok=True)
+    (storage_path / "generated_pdfs" / "with_email").mkdir(parents=True, exist_ok=True)
+    (storage_path / "generated_pdfs" / "without_email").mkdir(parents=True, exist_ok=True)
+    
+    return base_path, storage_path, temp_path
+
+# Initialize paths
+BASE_PATH, STORAGE_PATH, TEMP_PATH = get_base_paths()
+
+# Authentication configuration
+AUTHORIZED_EMAILS = [
+    "nbeesoo@nicl.mu",
+    "skhodabux@nicl.mu", 
+    "vikas.khanna@zwennpay.com"
+]
+
+def generate_otp():
+    """Generate a 6-digit OTP"""
+    import random
+    return str(random.randint(100000, 999999))
+
+def send_otp_email(email, otp):
+    """Send OTP via email using Brevo"""
+    try:
+        import sib_api_v3_sdk
+        from sib_api_v3_sdk.rest import ApiException
+        
+        # Get API key
+        BREVO_API_KEY = os.getenv('BREVO_API_KEY')
+        if not BREVO_API_KEY:
+            return False, "Brevo API key not configured"
+        
+        # Setup Brevo client
+        configuration = sib_api_v3_sdk.Configuration()
+        configuration.api_key['api-key'] = BREVO_API_KEY
+        api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+        
+        # Email content
+        subject = "NIC Policy Processor - Authentication Code"
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
+                <h2 style="color: #2c3e50; margin-bottom: 20px;">🔐 Authentication Required</h2>
+                <p style="font-size: 16px; margin-bottom: 30px;">Your authentication code for NIC Policy Processor:</p>
+                <div style="background: #ffffff; padding: 20px; border-radius: 8px; border: 2px solid #3498db; margin: 20px 0;">
+                    <h1 style="color: #3498db; font-size: 36px; margin: 0; letter-spacing: 5px;">{otp}</h1>
+                </div>
+                <p style="color: #7f8c8d; font-size: 14px; margin-top: 20px;">
+                    This code will expire in 10 minutes. Do not share this code with anyone.
+                </p>
+                <p style="color: #7f8c8d; font-size: 12px; margin-top: 30px;">
+                    NIC Life Insurance Mauritius - Secure Access System
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_content = f"""
+        NIC Policy Processor - Authentication Code
+        
+        Your authentication code is: {otp}
+        
+        This code will expire in 10 minutes.
+        Do not share this code with anyone.
+        
+        NIC Life Insurance Mauritius
+        """
+        
+        # Create email
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            to=[sib_api_v3_sdk.SendSmtpEmailTo(email=email)],
+            sender=sib_api_v3_sdk.SendSmtpEmailSender(email="CashBack@niclmauritius.site", name="NIC Security"),
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content
+        )
+        
+        # Send email
+        api_response = api_instance.send_transac_email(send_smtp_email)
+        return True, "OTP sent successfully"
+        
+    except Exception as e:
+        return False, f"Failed to send OTP: {str(e)}"
+
+def show_authentication():
+    """Show authentication interface"""
+    # Custom CSS for better styling
+    st.markdown("""
+    <style>
+    .auth-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin: 2rem 0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .auth-title {
+        color: white;
+        text-align: center;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .auth-subtitle {
+        color: rgba(255,255,255,0.9);
+        text-align: center;
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+    }
+    .security-badge {
+        background: rgba(255,255,255,0.1);
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 1rem 0;
+        backdrop-filter: blur(10px);
+    }
+    .otp-display {
+        background: linear-gradient(45deg, #4CAF50, #45a049);
+        color: white;
+        font-size: 2rem;
+        font-weight: bold;
+        text-align: center;
+        padding: 1rem;
+        border-radius: 10px;
+        letter-spacing: 3px;
+        margin: 1rem 0;
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header with company branding
+    st.markdown("""
+    <div class="auth-container">
+        <div class="auth-title">🔐 NIC Policy Processor</div>
+        <div class="auth-subtitle">Secure Authentication Portal</div>
+        <div style="text-align: center; color: rgba(255,255,255,0.8);">
+            <strong>NIC Life Insurance Mauritius</strong><br>
+            Authorized Personnel Only
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if not st.session_state.otp_sent:
+        # Step 1: Email input with enhanced styling
+        st.markdown("""
+        <div style="background: rgba(0,0,0,0.1); border: 2px solid #4CAF50; 
+                    border-radius: 10px; padding: 1rem; margin: 1rem 0;">
+            <h3 style="color: #2c3e50; margin: 0; text-align: center;">
+                📧 Step 1: Email Verification
+            </h3>
+            <p style="color: #555; text-align: center; margin: 0.5rem 0;">
+                Enter your authorized NIC email address
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Create a more visually appealing input
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col2:
+            email = st.text_input(
+                "Email Address",
+                placeholder="your.name@nicl.mu",
+                help="Only authorized NIC staff can access this system",
+                label_visibility="collapsed",
+                key="auth_email_input"
+            )
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("🚀 Send Authentication Code", type="primary", use_container_width=True):
+                if not email:
+                    st.error("❌ Please enter your email address")
+                elif email.lower().strip() not in [e.lower() for e in AUTHORIZED_EMAILS]:
+                    st.error("❌ Access Denied: Your email address is not authorized to use this system")
+                    st.info("📞 Contact IT support if you believe this is an error")
+                else:
+                # Generate and send OTP
+                 otp = generate_otp()
+                 success, message = send_otp_email(email, otp)
+                
+                if success:
+                    st.session_state.generated_otp = otp
+                    st.session_state.auth_email = email.lower().strip()
+                    st.session_state.otp_sent = True
+                    st.session_state.otp_timestamp = time.time()
+                    
+                    # Enhanced success message
+                    st.markdown("""
+                    <div style="background: linear-gradient(90deg, #4CAF50, #45a049); 
+                                color: white; padding: 1rem; border-radius: 10px; 
+                                text-align: center; margin: 1rem 0;">
+                        <h4 style="margin: 0;">✅ Authentication Code Sent!</h4>
+                        <p style="margin: 0.5rem 0;">Check your email for the 6-digit verification code</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    try:
+                        st.rerun()
+                    except AttributeError:
+                        st.experimental_rerun()
+                else:
+                    st.markdown(f"""
+                    <div style="background: linear-gradient(90deg, #f44336, #d32f2f); 
+                                color: white; padding: 1rem; border-radius: 10px; 
+                                text-align: center; margin: 1rem 0;">
+                        <h4 style="margin: 0;">❌ Authentication Failed</h4>
+                        <p style="margin: 0.5rem 0;">{message}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+    
+    else:
+        # Step 2: OTP verification with enhanced styling
+        st.markdown("""
+        <div style="background: rgba(0,0,0,0.1); border: 2px solid #2196F3; 
+                    border-radius: 10px; padding: 1rem; margin: 1rem 0;">
+            <h3 style="color: #2c3e50; margin: 0; text-align: center;">
+                🔑 Step 2: Enter Authentication Code
+            </h3>
+            <p style="color: #555; text-align: center; margin: 0.5rem 0;">
+                6-digit code sent to: <strong style="color: #2196F3;">{}</strong>
+            </p>
+        </div>
+        """.format(st.session_state.auth_email), unsafe_allow_html=True)
+        
+        # Check if OTP expired (10 minutes)
+        if time.time() - st.session_state.otp_timestamp > 600:
+            st.markdown("""
+            <div style="background: linear-gradient(90deg, #ff9800, #f57c00); 
+                        color: white; padding: 1rem; border-radius: 10px; 
+                        text-align: center; margin: 1rem 0;">
+                <h4 style="margin: 0;">⏰ Code Expired</h4>
+                <p style="margin: 0.5rem 0;">Your authentication code has expired. Please request a new one.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🔄 Request New Code", use_container_width=True, key="request_new_code_expired"):
+                    st.session_state.otp_sent = False
+                    st.session_state.generated_otp = None
+                    try:
+                        st.rerun()
+                    except AttributeError:
+                        st.experimental_rerun()
+            return
+        
+        # Enhanced OTP input section with dynamic timer
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            # Time remaining display with JavaScript countdown
+            time_left = 600 - int(time.time() - st.session_state.otp_timestamp)
+            
+            # Color changes based on time left
+            if time_left > 300:  # More than 5 minutes - green
+                timer_color = "#4CAF50"
+            elif time_left > 120:  # More than 2 minutes - orange
+                timer_color = "#FF9800"
+            else:  # Less than 2 minutes - red
+                timer_color = "#f44336"
+            
+            # Simple timer display (no auto-countdown to avoid blocking UI)
+            minutes = time_left // 60
+            seconds = time_left % 60
+            
+            st.markdown(f"""
+            <div style="background: rgba(0,0,0,0.05); border: 2px solid {timer_color}; 
+                        border-radius: 10px; padding: 1rem; text-align: center; margin: 1rem 0;">
+                <h4 style="color: {timer_color}; margin: 0;">⏰ Code Expires In</h4>
+                <div style="font-size: 2rem; font-weight: bold; color: {timer_color};">
+                    {minutes}:{seconds:02d}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # OTP input field
+            entered_otp = st.text_input(
+                "Authentication Code",
+                placeholder="000000",
+                max_chars=6,
+                help="Enter the 6-digit code from your email",
+                label_visibility="collapsed",
+                key="otp_input_main"
+            )
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Verify button
+            if st.button("✅ Verify & Access System", type="primary", use_container_width=True):
+                if not entered_otp:
+                    st.markdown("""
+                    <div style="background: #f44336; color: white; padding: 0.5rem; 
+                                border-radius: 5px; text-align: center; margin: 0.5rem 0;">
+                        ❌ Please enter the authentication code
+                    </div>
+                    """, unsafe_allow_html=True)
+                elif entered_otp == st.session_state.generated_otp:
+                    st.session_state.authenticated = True
+                    st.session_state.auth_timestamp = time.time()
+                    
+                    st.markdown("""
+                    <div style="background: linear-gradient(90deg, #4CAF50, #45a049); 
+                                color: white; padding: 1rem; border-radius: 10px; 
+                                text-align: center; margin: 1rem 0;">
+                        <h3 style="margin: 0;">🎉 Authentication Successful!</h3>
+                        <p style="margin: 0.5rem 0;">Welcome to NIC Policy Processor</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.balloons()
+                    time.sleep(1)
+                    try:
+                        st.rerun()
+                    except AttributeError:
+                        st.experimental_rerun()
+                else:
+                    st.markdown("""
+                    <div style="background: #f44336; color: white; padding: 0.5rem; 
+                                border-radius: 5px; text-align: center; margin: 0.5rem 0;">
+                        ❌ Invalid code. Please check your email and try again.
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Request new code button
+            if st.button("🔄 Send New Code", use_container_width=True, key="send_new_code_first"):
+                st.session_state.otp_sent = False
+                st.session_state.generated_otp = None
+                try:
+                    st.rerun()
+                except AttributeError:
+                    st.experimental_rerun()
+            
+            # OTP input with custom styling
+            entered_otp = st.text_input(
+                "Authentication Code",
+                placeholder="000000",
+                max_chars=6,
+                help="Enter the 6-digit code from your email",
+                label_visibility="collapsed",
+                key="otp_input_expired"
+            )
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Verify button
+            if st.button("✅ Verify & Access System", type="primary", use_container_width=True):
+                if not entered_otp:
+                    st.markdown("""
+                    <div style="background: #f44336; color: white; padding: 0.5rem; 
+                                border-radius: 5px; text-align: center; margin: 0.5rem 0;">
+                        ❌ Please enter the authentication code
+                    </div>
+                    """, unsafe_allow_html=True)
+                elif entered_otp == st.session_state.generated_otp:
+                    st.session_state.authenticated = True
+                    st.session_state.auth_timestamp = time.time()
+                    
+                    st.markdown("""
+                    <div style="background: linear-gradient(90deg, #4CAF50, #45a049); 
+                                color: white; padding: 1rem; border-radius: 10px; 
+                                text-align: center; margin: 1rem 0;">
+                        <h3 style="margin: 0;">🎉 Authentication Successful!</h3>
+                        <p style="margin: 0.5rem 0;">Welcome to NIC Policy Processor</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.balloons()
+                    time.sleep(1)
+                    try:
+                        st.rerun()
+                    except AttributeError:
+                        st.experimental_rerun()
+                else:
+                    st.markdown("""
+                    <div style="background: #f44336; color: white; padding: 0.5rem; 
+                                border-radius: 5px; text-align: center; margin: 0.5rem 0;">
+                        ❌ Invalid code. Please check your email and try again.
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Request new code button
+            if st.button("🔄 Send New Code", use_container_width=True, key="send_new_code_second"):
+                st.session_state.otp_sent = False
+                st.session_state.generated_otp = None
+                try:
+                    st.rerun()
+                except AttributeError:
+                    st.experimental_rerun()
+
+def check_session_timeout():
+    """Check if user session has timed out (2 hours)"""
+    if st.session_state.authenticated:
+        if time.time() - st.session_state.auth_timestamp > 7200:  # 2 hours
+            st.session_state.authenticated = False
+            st.session_state.auth_email = None
+            st.session_state.otp_sent = False
+            st.session_state.generated_otp = None
+            st.warning("⏰ Session expired. Please authenticate again.")
+            try:
+                st.rerun()
+            except AttributeError:
+                st.experimental_rerun()
+
 # Set page config
 st.set_page_config(
     page_title="PDF Policy Processor",
@@ -20,26 +447,26 @@ if 'results' not in st.session_state:
     st.session_state.results = None
 if 'processing_done' not in st.session_state:
     st.session_state.processing_done = False
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'auth_email' not in st.session_state:
+    st.session_state.auth_email = None
+if 'otp_sent' not in st.session_state:
+    st.session_state.otp_sent = False
+if 'generated_otp' not in st.session_state:
+    st.session_state.generated_otp = None
 
 def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
     """Process uploaded PDF and Excel files"""
     
-    # Save uploaded files to current directory
-    pdf_path = "/var/www/cashback/temp/temp_uploaded.pdf"
-    excel_path = "/var/www/cashback/temp/temp_uploaded.xlsx"
+    # Save uploaded files to temp directory
+    pdf_path = TEMP_PATH / "temp_uploaded.pdf"
+    excel_path = TEMP_PATH / "temp_uploaded.xlsx"
     
     with open(pdf_path, "wb") as f:
         f.write(pdf_file.getvalue())
     
     with open(excel_path, "wb") as f:
-        f.write(excel_file.getvalue())
-    
-    # Also save a permanent copy for email sending
-    permanent_excel_dir = "/var/www/cashback/storage/uploaded_files"
-    os.makedirs(permanent_excel_dir, exist_ok=True)
-    permanent_excel_path = os.path.join(permanent_excel_dir, "latest_excel.xlsx")
-    
-    with open(permanent_excel_path, "wb") as f:
         f.write(excel_file.getvalue())
     
     # Read Excel data
@@ -69,14 +496,14 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
         return None
     
     # Create output directories and clean old files
-    os.makedirs("/var/www/cashback/storage/generated_pdfs/with_email", exist_ok=True)
-    os.makedirs("/var/www/cashback/storage/generated_pdfs/without_email", exist_ok=True)
+    os.makedirs("policies_with_email", exist_ok=True)
+    os.makedirs("policies_without_email", exist_ok=True)
     
     # Clean old PDF files from previous sessions
     import glob
-    for old_file in glob.glob("/var/www/cashback/storage/generated_pdfs/with_email/*.pdf"):
+    for old_file in glob.glob("policies_with_email/*.pdf"):
         os.remove(old_file)
-    for old_file in glob.glob("/var/www/cashback/storage/generated_pdfs/without_email/*.pdf"):
+    for old_file in glob.glob("policies_without_email/*.pdf"):
         os.remove(old_file)
     
     st.info("🧹 Cleaned old PDF files from previous sessions")
@@ -132,16 +559,16 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
         # Close the PDF file
         pdf_file_handle.close()
         
-        # Clean up temp files
+        # Clean up temp PDF file (but keep Excel file for email sending)
         try:
             os.remove(pdf_path)
-            os.remove(excel_path)
+            # Keep excel_path for email sending - don't delete it
         except:
             pass
     
     # Count results
-    policies_with_email = len(list(Path("/var/www/cashback/storage/generated_pdfs/with_email").glob("*.pdf")))
-    policies_without_email = len(list(Path("/var/www/cashback/storage/generated_pdfs/without_email").glob("*.pdf")))
+    policies_with_email = len(list(Path("policies_with_email").glob("*.pdf")))
+    policies_without_email = len(list(Path("policies_without_email").glob("*.pdf")))
     
     status_text.text("✅ Processing completed!")
     progress_bar.progress(1.0)
@@ -232,7 +659,7 @@ def save_policy_pdf(pdf_reader, page_numbers, policy_number, df):
         st.warning(f"⚠️ Policy {policy_number} has email but no NIC for password protection")
     
     # Save to appropriate folder
-    folder = "/var/www/cashback/storage/generated_pdfs/with_email" if has_email else "/var/www/cashback/storage/generated_pdfs/without_email"
+    folder = "policies_with_email" if has_email else "policies_without_email"
     # Replace invalid filename characters
     safe_policy_number = policy_number.replace('/', '_').replace('\\', '_')
     filename = f"{safe_policy_number}.pdf"
@@ -258,25 +685,25 @@ def create_download_zip(folder_path, zip_name):
 def check_excel_file_exists():
     """Check if Excel file exists for email sending"""
     excel_locations = [
-        "Compile CBOpt Nov25.xlsx",
-        "storage/uploaded_files/latest_excel.xlsx",
-        "temp/temp_uploaded.xlsx"
+        "Compile CBOpt Nov25.xlsx",  # Legacy filename
+        STORAGE_PATH / "uploaded_files" / "latest_excel.xlsx",
+        TEMP_PATH / "temp_uploaded.xlsx"
     ]
     
     for location in excel_locations:
-        if os.path.exists(location):
-            return location
+        if Path(location).exists():
+            return str(location)
     return None
 
 def check_pdf_files_exist():
     """Check if PDF files exist for email sending"""
     pdf_locations = [
-        "/var/www/cashback/storage/generated_pdfs/with_email",
-        "storage/generated_pdfs/with_email"
+        "policies_with_email",  # Legacy folder
+        STORAGE_PATH / "generated_pdfs" / "with_email"
     ]
     
     for location in pdf_locations:
-        if os.path.exists(location):
+        if Path(location).exists():
             pdf_files = list(Path(location).glob("*.pdf"))
             if pdf_files:
                 return len(pdf_files)
@@ -285,12 +712,12 @@ def check_pdf_files_exist():
 def check_pdf_files_without_email():
     """Check if PDF files exist without email addresses (for printing)"""
     pdf_locations = [
-        "/var/www/cashback/storage/generated_pdfs/without_email",
-        "storage/generated_pdfs/without_email"
+        "policies_without_email",  # Legacy folder
+        STORAGE_PATH / "generated_pdfs" / "without_email"
     ]
     
     for location in pdf_locations:
-        if os.path.exists(location):
+        if Path(location).exists():
             pdf_files = list(Path(location).glob("*.pdf"))
             if pdf_files:
                 return len(pdf_files)
@@ -346,6 +773,9 @@ def send_emails_via_subprocess():
         start_time = time.time()
         last_email_time = start_time
         
+        # Initialize/clear email results in session state for new sending session
+        st.session_state.email_results = []
+        
         # Read output in real-time
         while True:
             try:
@@ -367,34 +797,54 @@ def send_emails_via_subprocess():
                     last_email_time = time.time()
                     
                     # Extract email and policy info from success message
+                    # Format: "✅ Sent to email@domain.com - Policy: 12345"
                     import re
-                    match = re.search(r'Sent to (.+?) - Policy: (.+)', line)
+                    match = re.search(r'✅ Sent to (.+?) - Policy: (.+)', line)
                     if match:
                         email, policy = match.groups()
-                        successful_emails.append({
+                        email_info = {
                             'email': email.strip(),
                             'policy': policy.strip(),
                             'timestamp': time.strftime("%H:%M:%S")
+                        }
+                        successful_emails.append(email_info)
+                        
+                        # Store in session state for CSV
+                        st.session_state.email_results.append({
+                            'email': email.strip(),
+                            'policy': policy.strip(),
+                            'status': 'Success',
+                            'timestamp': time.strftime("%H:%M:%S"),
+                            'details': 'Email sent successfully'
                         })
                     
                     status_placeholder.success(f"📧 Successfully sent email #{sent_count}")
                     
-                elif "❌ Failed" in line or ("Error" in line and "@" in line):
+                elif "❌ Failed to send to" in line:
                     failed_count += 1
                     
                     # Extract failure details
+                    # Format: "❌ Failed to send to email@domain.com - Policy: 12345"
                     import re
-                    # Try to extract email and policy from failure message
-                    email_match = re.search(r'(?:Failed to send to|Error.*?)(.+?@.+?)(?:\s|$)', line)
-                    policy_match = re.search(r'Policy: (.+?)(?:\s|$)', line)
-                    
-                    failed_info = {
-                        'email': email_match.group(1).strip() if email_match else 'Unknown',
-                        'policy': policy_match.group(1).strip() if policy_match else 'Unknown',
-                        'reason': line.strip(),
-                        'timestamp': time.strftime("%H:%M:%S")
-                    }
-                    failed_emails.append(failed_info)
+                    match = re.search(r'❌ Failed to send to (.+?) - Policy: (.+)', line)
+                    if match:
+                        email, policy = match.groups()
+                        failed_info = {
+                            'email': email.strip(),
+                            'policy': policy.strip(),
+                            'reason': line.strip(),
+                            'timestamp': time.strftime("%H:%M:%S")
+                        }
+                        failed_emails.append(failed_info)
+                        
+                        # Store in session state for CSV
+                        st.session_state.email_results.append({
+                            'email': email.strip(),
+                            'policy': policy.strip(),
+                            'status': 'Failed',
+                            'timestamp': time.strftime("%H:%M:%S"),
+                            'details': failed_info['reason']
+                        })
                     
                     status_placeholder.error(f"❌ Email failed (Total failures: {failed_count})")
                 elif "📊 Loaded" in line and "policies" in line:
@@ -451,6 +901,20 @@ def send_emails_via_subprocess():
         
         # Wait for process to complete
         return_code = process.wait()
+        
+        # Load results from file
+        results_file = TEMP_PATH / "email_results.json"
+        if results_file.exists():
+            try:
+                import json
+                with open(results_file, 'r') as f:
+                    file_results = json.load(f)
+                
+                # Add file results to session state
+                st.session_state.email_results.extend(file_results)
+                
+            except Exception as e:
+                pass  # Silently handle file reading errors
         
         # Show final results with enhanced feedback
         total_time = time.time() - start_time
@@ -599,6 +1063,87 @@ def send_emails_via_subprocess():
                         st.success("✅ Low failure rate. Most emails were delivered successfully.")
                 else:
                     st.success("🎉 Perfect delivery! All emails were sent successfully.")
+            
+            
+        # Add comprehensive CSV download (moved outside tabs for visibility)
+        if sent_count > 0 or failed_count > 0:
+            st.markdown("---")
+            st.subheader("📥 Download Complete Report")
+            
+            # Create comprehensive report combining all data
+            all_emails_data = []
+            
+            # Add successful emails
+            for email_info in successful_emails:
+                all_emails_data.append({
+                    'Email': email_info['email'],
+                    'Policy_Number': email_info['policy'],
+                    'Status': 'Success',
+                    'Timestamp': email_info['timestamp'],
+                    'Details': 'Email sent successfully'
+                })
+            
+            # Add failed emails
+            for email_info in failed_emails:
+                all_emails_data.append({
+                    'Email': email_info['email'],
+                    'Policy_Number': email_info['policy'],
+                    'Status': 'Failed',
+                    'Timestamp': email_info['timestamp'],
+                    'Details': email_info['reason']
+                })
+            
+            if all_emails_data:
+                # Create comprehensive DataFrame
+                complete_df = pd.DataFrame(all_emails_data)
+                
+                # Sort by timestamp for chronological order
+                complete_df = complete_df.sort_values('Timestamp')
+                
+                # Add summary information at the top
+                summary_data = {
+                    'Email': ['SUMMARY', 'SUMMARY', 'SUMMARY', 'SUMMARY'],
+                    'Policy_Number': ['', '', '', ''],
+                    'Status': ['Total Processed', 'Successful', 'Failed', 'Success Rate'],
+                    'Timestamp': [time.strftime('%Y-%m-%d %H:%M:%S'), '', '', ''],
+                    'Details': [
+                        f'{sent_count + failed_count} emails',
+                        f'{sent_count} emails',
+                        f'{failed_count} emails',
+                        f'{(sent_count / (sent_count + failed_count) * 100) if (sent_count + failed_count) > 0 else 0:.1f}%'
+                    ]
+                }
+                
+                summary_df = pd.DataFrame(summary_data)
+                final_df = pd.concat([summary_df, complete_df], ignore_index=True)
+                
+                # Create CSV data
+                csv_data = final_df.to_csv(index=False)
+                
+                # Download button for complete report
+                st.download_button(
+                    label="📊 Download Complete Email Report (CSV)",
+                    data=csv_data,
+                    file_name=f"email_delivery_report_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    help="Download a comprehensive CSV report with all email delivery details",
+                    use_container_width=True
+                )
+                
+                # Show preview of the data
+                with st.expander("👀 Preview Complete Report"):
+                    st.dataframe(
+                        final_df,
+                        column_config={
+                            "Email": "�  Email Address",
+                            "Policy_Number": "📄 Policy Number",
+                            "Status": "� Steatus",
+                            "Timestamp": "⏰ Time",
+                            "Details": "📝 Details"
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
         
         # Show complete output in expander
         if output_lines:
@@ -621,7 +1166,7 @@ def merge_pdfs_for_printing():
     try:
         # Find the correct input folder
         input_folders = [
-            "/var/www/cashback/storage/generated_pdfs/without_email",
+            "policies_without_email",
             "storage/generated_pdfs/without_email"
         ]
         
@@ -637,7 +1182,7 @@ def merge_pdfs_for_printing():
             st.error("❌ No PDFs without email addresses found")
             return
         
-        output_file = "/var/www/cashback/storage/policies_for_printing.pdf"
+        output_file = str(STORAGE_PATH / "policies_for_printing.pdf")
         
         status_placeholder.info("🔍 Scanning PDF files...")
         
@@ -664,8 +1209,11 @@ def merge_pdfs_for_printing():
         # Initialize progress tracking
         progress_placeholder.progress(0, "Starting PDF merge...")
         
-        # Use PyPDF2 PdfFileMerger for robust merging
-        merger = PyPDF2.PdfMerger()
+        # Use PyPDF2 PdfMerger (updated from deprecated PdfFileMerger)
+        try:
+            merger = PyPDF2.PdfMerger()  # New version
+        except AttributeError:
+            merger = PyPDF2.PdfFileMerger()  # Fallback for older versions
         successful_merges = 0
         failed_files = []
         
@@ -785,6 +1333,46 @@ def merge_pdfs_for_printing():
         st.exception(e)
 
 def main():
+    # Check authentication first
+    check_session_timeout()
+    
+    if not st.session_state.authenticated:
+        show_authentication()
+        return
+    
+    # Enhanced sidebar with user info
+    st.sidebar.markdown("""
+    <div style="background: linear-gradient(135deg, #4CAF50, #45a049); 
+                color: white; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
+        <h4 style="margin: 0; text-align: center;">👤 Authenticated User</h4>
+        <p style="margin: 0.5rem 0; text-align: center; font-size: 0.9rem;">
+            <strong>{}</strong>
+        </p>
+        <p style="margin: 0; text-align: center; font-size: 0.8rem; opacity: 0.8;">
+            Session Active
+        </p>
+    </div>
+    """.format(st.session_state.auth_email), unsafe_allow_html=True)
+    
+    if st.sidebar.button("🚪 Secure Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.auth_email = None
+        st.session_state.otp_sent = False
+        st.session_state.generated_otp = None
+        try:
+            st.rerun()
+        except AttributeError:
+            st.experimental_rerun()
+    
+    # Add company branding to sidebar
+    st.sidebar.markdown("""
+    <div style="text-align: center; margin-top: 2rem; padding: 1rem; 
+                background: rgba(0,0,0,0.05); border-radius: 10px;">
+        <h5 style="margin: 0; color: #666;">NIC Life Insurance</h5>
+        <p style="margin: 0; font-size: 0.8rem; color: #888;">Mauritius</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.title("📄 PDF Policy Processor")
     st.markdown("Extract individual policies from merged PDF and organize by email availability")
     
@@ -820,7 +1408,7 @@ def main():
                 st.session_state.processing_done = True
                 
                 # Force rerun to show results
-                st.rerun()
+                st.experimental_rerun()
     
     # Results section - ALWAYS show if we have results in session state
     if st.session_state.results:
@@ -845,7 +1433,7 @@ def main():
         
         with col1:
             if results['with_email'] > 0:
-                zip_data = create_download_zip("/var/www/cashback/storage/generated_pdfs/with_email", "policies_with_email.zip")
+                zip_data = create_download_zip("policies_with_email", "policies_with_email.zip")
                 st.download_button(
                     label="📧 Download Policies WITH Email",
                     data=zip_data,
@@ -856,7 +1444,7 @@ def main():
         
         with col2:
             if results['without_email'] > 0:
-                zip_data = create_download_zip("/var/www/cashback/storage/generated_pdfs/without_email", "policies_without_email.zip")
+                zip_data = create_download_zip("policies_without_email", "policies_without_email.zip")
                 st.download_button(
                     label="❓ Download Policies WITHOUT Email",
                     data=zip_data,
@@ -875,7 +1463,7 @@ def main():
             # Clear session state
             st.session_state.results = None
             st.session_state.processing_done = False
-            st.rerun()
+            st.experimental_rerun()
     
     elif pdf_file and excel_file:
         st.info("👆 Click 'Process Files' to extract policies")
@@ -910,6 +1498,82 @@ def main():
             if excel_file_exists and pdf_files_exist:
                 if st.button("📧 Send Emails Now", type="primary", use_container_width=True):
                     send_emails_via_subprocess()
+                
+                # Add dynamic CSV download for email list with status
+                st.markdown("---")
+                st.write("📥 **Download Email List**")
+                
+                # Create email list CSV with dynamic status
+                excel_file = check_excel_file_exists()
+                if excel_file:
+                    try:
+                        df = pd.read_excel(excel_file)
+                        
+                        # Create email list with status tracking
+                        email_list = []
+                        for _, row in df.iterrows():
+                            policy_str = str(row['Policy No'])
+                            email = row['Owner 1 Email']
+                            title = row.get('Title', '').strip() if pd.notna(row.get('Title', '')) else ''
+                            lastname = row.get('LastName', '').strip() if pd.notna(row.get('LastName', '')) else ''
+                            
+                            if pd.notna(email) and email.strip():
+                                greeting = f"{title} {lastname}".strip() if title and lastname else "Valued Client"
+                                
+                                # Check if email sending results exist in session state
+                                status = 'Ready to Send'
+                                timestamp = ''
+                                details = 'Pending'
+                                
+                                if 'email_results' in st.session_state:
+                                    # Look for this policy in the results
+                                    for result in st.session_state.email_results:
+                                        if result['policy'] == policy_str and result['email'] == email.strip():
+                                            status = result['status']
+                                            timestamp = result.get('timestamp', '')
+                                            details = result.get('details', '')
+                                            break
+                                
+                                email_list.append({
+                                    'Policy_Number': policy_str,
+                                    'Email': email.strip(),
+                                    'Title': title,
+                                    'LastName': lastname,
+                                    'Greeting': greeting,
+                                    'Status': status,
+                                    'Timestamp': timestamp,
+                                    'Details': details
+                                })
+                        
+                        if email_list:
+                            email_df = pd.DataFrame(email_list)
+                            csv_data = email_df.to_csv(index=False)
+                            
+                            # Count statuses
+                            sent_count = len([e for e in email_list if e['Status'] == 'Success'])
+                            failed_count = len([e for e in email_list if e['Status'] == 'Failed'])
+                            pending_count = len([e for e in email_list if e['Status'] == 'Ready to Send'])
+                            
+                            st.download_button(
+                                label="📊 Download Email Status Report (CSV)",
+                                data=csv_data,
+                                file_name=f"email_status_report_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                help="Download the complete email status report with delivery results",
+                                use_container_width=True
+                            )
+                            
+                            # Show status summary
+                            if sent_count > 0 or failed_count > 0:
+                                st.caption(f"📊 Status: ✅ {sent_count} sent, ❌ {failed_count} failed, ⏳ {pending_count} pending")
+                            else:
+                                st.caption(f"📧 {len(email_list)} emails ready to send")
+                            
+
+                                
+                    except Exception as e:
+                        st.error(f"Error creating email list: {e}")
+                        
             else:
                 st.button("📧 Send Emails Now", disabled=True, use_container_width=True)
                 st.caption("⚠️ Upload and process files first")

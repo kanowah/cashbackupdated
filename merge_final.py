@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Final working PDF merger using PdfFileMerger
+Final working PDF merger using PdfMerger (cross-version compatible)
 """
 
 import PyPDF2
 import os
 
 def merge_all_pdfs():
-    """Merge all PDFs using the robust PdfFileMerger approach"""
+    """Merge all PDFs using the robust PdfMerger approach (cross-version compatible)"""
     
     input_folder = "policies_without_email"
     output_file = "policies_for_printing.pdf"
@@ -43,8 +43,11 @@ def merge_all_pdfs():
             return False
     
     try:
-        # Use PdfFileMerger for robust merging
-        merger = PyPDF2.PdfMerger()
+        # Use PdfMerger (updated from deprecated PdfFileMerger)
+        try:
+            merger = PyPDF2.PdfMerger()  # New version
+        except AttributeError:
+            merger = PyPDF2.PdfFileMerger()  # Fallback for older versions
         
         successful_merges = 0
         

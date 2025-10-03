@@ -6,6 +6,25 @@ import os
 from pathlib import Path
 import time
 
+# Environment detection and path setup (same as main app)
+def get_base_paths():
+    """Get appropriate paths based on environment"""
+    if os.path.exists("/var/www/cashback"):
+        # VPS/Linux environment
+        base_path = Path("/var/www/cashback")
+        storage_path = base_path / "storage"
+        temp_path = base_path / "temp"
+    else:
+        # Local/Windows environment
+        base_path = Path(".")
+        storage_path = base_path / "storage"
+        temp_path = base_path / "temp"
+    
+    return base_path, storage_path, temp_path
+
+# Initialize paths
+BASE_PATH, STORAGE_PATH, TEMP_PATH = get_base_paths()
+
 def setup_brevo_client(api_key):
     """Setup Brevo API client"""
     configuration = sib_api_v3_sdk.Configuration()
@@ -20,6 +39,9 @@ def send_policy_emails():
     SENDER_NAME = "NIC Life Insurance Mauritius"     # Your company name
     REPLY_TO_EMAIL = "customerservice@nicl.mu"            # Reply-to email
     REPLY_TO_NAME = "NIC Life Insurance"             # Reply-to name
+    
+    # Initialize results tracking
+    email_results = []
     
     # Verify sender email first
     print(f"🔍 Using sender: {SENDER_NAME} <{SENDER_EMAIL}>")
@@ -42,24 +64,15 @@ def send_policy_emails():
     <!-- Main Content -->
     <div style="background: #ffffff; padding: 30px 20px;
         
-        <p style="font-size: 16px; margin-bottom: 20px;">Dear Valued Client,</p>
+        <p style="font-size: 16px; margin-bottom: 20px;">Dear {greeting},</p>
         
         <p style="font-size: 14px; margin-bottom: 20px;">
             Greetings from NIC.
         </p>
         
         <p style="font-size: 14px; margin-bottom: 20px;">
-            We are pleased to inform you that you are entitled to a <strong>Cash Back benefit</strong> under your Life Insurance Policy.
+            We are pleased to inform you that you are entitled to a Cash Back benefit under your <strong>Life Insurance Policy Number {policy_number}</strong>.
         </p>
-        
-        <!-- Policy Info Box -->
-        <table style="width: 100%; background-color: #f8f9fa; border-left: 4px solid #2c3e50; margin: 20px 0;" cellpadding="15" cellspacing="0">
-            <tr>
-                <td>
-                    <p style="margin: 0; font-size: 16px;"><strong>Policy Number:</strong> <span style="color: #2c3e50; font-weight: bold;">{policy_number}</span></p>
-                </td>
-            </tr>
-        </table>
         
         <p style="font-size: 14px; margin-bottom: 15px;">
             Please find attached the following documents for your reference:
@@ -70,23 +83,19 @@ def send_policy_emails():
             <li style="margin-bottom: 8px;">Cash Back Form</li>
         </ul>
         
-        <!-- Security Notice -->
         <p style="font-size: 14px; margin-bottom: 20px;">
-            <strong>Security Information:</strong> For your security, the attached PDF is password-protected. Please use your <strong>National Identity Number</strong> as the password to open the file.
+            For security reasons, the PDF is password-protected and please use your <strong>National Identity number to access the file</strong>.
         </p>
         
-        <!-- Instructions -->
-        <div style="background-color: #e8f4fd; border: 1px solid #bee5eb; padding: 20px; margin: 25px 0;">
-            <h3 style="color: #0c5460; margin: 0 0 15px 0; font-size: 16px; font-weight: bold;">Next Steps</h3>
-            <p style="margin: 0 0 15px 0; font-size: 14px; color: #0c5460;">
-                To proceed, kindly reply directly to this email with the following documents attached:
-            </p>
-            <ul style="font-size: 14px; color: #0c5460; margin: 0; padding-left: 20px;">
-                <li style="margin-bottom: 8px;">The completed and signed Cash Back form (both signatures are required for joint policies).</li>
-                <li style="margin-bottom: 8px;">A copy of your ID (copies of both IDs are required for joint policies).</li>
-                <li style="margin-bottom: 8px;">The upper part of your bank statement (for joint life policies, a joint bank account is required. If you do not hold one, please visit the nearest NIC branch to complete the Cash Back formalities).</li>
-            </ul>
-        </div>
+        <p style="font-size: 14px; margin-bottom: 20px;">
+            To proceed, kindly reply directly to this email with the following documents attached:
+        </p>
+        
+        <ul style="font-size: 14px; margin-bottom: 20px; padding-left: 20px;">
+            <li style="margin-bottom: 8px;">The completed and signed Cash Back form (both signatures are required for joint policies).</li>
+            <li style="margin-bottom: 8px;">A copy of your ID (copies of both IDs are required for joint policies).</li>
+            <li style="margin-bottom: 8px;">The upper part of your bank statement (for joint life policies, a joint bank account is required. If you do not hold one, please visit the nearest NIC branch to complete the Cash Back formalities).</li>
+        </ul>
         
         <p style="font-size: 14px; margin-bottom: 20px;">
             Should you require any further assistance, our Customer Service team is available on <strong>602 3000</strong>, Monday to Friday, from 08:30 to 16:45.
@@ -109,19 +118,17 @@ def send_policy_emails():
 
     # Plain text version for email clients that don't support HTML
     EMAIL_TEMPLATE_TEXT = """
-Dear Valued Client,
+Dear {greeting},
 
 Greetings from NIC.
 
-We are pleased to inform you that you are entitled to a CASH BACK BENEFIT under your Life Insurance Policy.
-
-Policy Number: {policy_number}
+We are pleased to inform you that you are entitled to a Cash Back benefit under your Life Insurance Policy Number {policy_number}.
 
 Please find attached the following documents for your reference:
 - Cash Back Letter
 - Cash Back Form
 
-For your security, the attached PDF is password-protected. Please use your National Identity number as the password to open the file.
+For security reasons, the PDF is password-protected and please use your National Identity number to access the file.
 
 To proceed, kindly reply directly to this email with the following documents attached:
 - The completed and signed Cash Back form (both signatures are required for joint policies).
@@ -152,45 +159,71 @@ NIC - Serving you, Serving the Nation
         print(f"❌ Error setting up Brevo client: {e}")
         return
     
+    # Find Excel file in multiple locations (cross-platform paths)
+    excel_locations = [
+        "Compile CBOpt Nov25.xlsx",  # Legacy filename
+        STORAGE_PATH / "uploaded_files" / "latest_excel.xlsx",
+        TEMP_PATH / "temp_uploaded.xlsx"
+    ]
+    
+    excel_file = None
+    for location in excel_locations:
+        if Path(location).exists():
+            excel_file = location
+            break
+    
+    if not excel_file:
+        print("❌ No Excel file found in any of the expected locations:")
+        for location in excel_locations:
+            print(f"   - {location}")
+        return
+    
     # Read Excel file to get policy-email mapping
     try:
-        # Try multiple Excel file locations
-        excel_files = [
-            "Compile CBOpt Nov25.xlsx",
-            "/var/www/cashback/storage/uploaded_files/latest_excel.xlsx"
-        ]
-        df = None
-        for excel_file in excel_files:
-            if os.path.exists(excel_file):
-                df = pd.read_excel(excel_file)
-                print(f"📊 Using Excel file: {excel_file}")
-                break
-        if df is None:
-            df = pd.read_excel("Compile CBOpt Nov25.xlsx")  # fallback
-        print(f"📊 Loaded {len(df)} policies from Excel")
+        df = pd.read_excel(excel_file)
+        print(f"📊 Loaded {len(df)} policies from Excel file: {excel_file}")
     except Exception as e:
         print(f"❌ Error reading Excel file: {e}")
         return
     
-    # Check if /var/www/cashback/storage/generated_pdfs/with_email folder exists
-    pdf_folder = Path("/var/www/cashback/storage/generated_pdfs/with_email")
-    if not pdf_folder.exists():
-        print("❌ '/var/www/cashback/storage/generated_pdfs/with_email' folder not found. Run create_complete_analysis.py first.")
+    # Check if PDF folder exists (cross-platform paths)
+    pdf_locations = [
+        "policies_with_email",  # Legacy folder
+        STORAGE_PATH / "generated_pdfs" / "with_email"
+    ]
+    
+    pdf_folder = None
+    for location in pdf_locations:
+        if Path(location).exists():
+            pdf_folder = Path(location)
+            break
+    
+    if not pdf_folder:
+        print("❌ No PDF folder found in any of the expected locations:")
+        for location in pdf_locations:
+            print(f"   - {location}")
         return
     
     # Get list of available PDF files
     pdf_files = list(pdf_folder.glob("*.pdf"))
     print(f"📁 Found {len(pdf_files)} PDF files ready for sending")
     
-    # Create policy-email mapping
-    policy_email_map = {}
+    # Create policy data mapping with personalization
+    policy_data_map = {}
     for _, row in df.iterrows():
         policy_str = str(row['Policy No'])
         email = row['Owner 1 Email']
+        title = row.get('Title', '').strip() if pd.notna(row.get('Title', '')) else ''
+        lastname = row.get('LastName', '').strip() if pd.notna(row.get('LastName', '')) else ''
+        
         if pd.notna(email) and email.strip():  # Check for valid email
-            policy_email_map[policy_str] = email
+            policy_data_map[policy_str] = {
+                'email': email.strip(),
+                'title': title,
+                'lastname': lastname
+            }
     
-    print(f"📧 Found {len(policy_email_map)} valid email addresses")
+    print(f"📧 Found {len(policy_data_map)} valid email addresses")
     
     # Send emails
     sent_count = 0
@@ -209,14 +242,17 @@ NIC - Serving you, Serving the Nation
             # Numeric format: 29031933 -> 29031933
             policy_lookup = filename
         
-        # Find email for this policy
-        if policy_lookup not in policy_email_map:
+        # Find email and personal data for this policy
+        if policy_lookup not in policy_data_map:
             print(f"⚠️  No email found for policy: {policy_lookup}")
             failed_count += 1
             failed_policies.append(policy_lookup)
             continue
         
-        recipient_email = policy_email_map[policy_lookup]
+        policy_data = policy_data_map[policy_lookup]
+        recipient_email = policy_data['email']
+        title = policy_data['title']
+        lastname = policy_data['lastname']
         
         try:
             # Read PDF file and encode to base64
@@ -224,21 +260,28 @@ NIC - Serving you, Serving the Nation
                 pdf_content = f.read()
                 pdf_base64 = base64.b64encode(pdf_content).decode('utf-8')
             
-            # Extract customer name (basic extraction from policy number)
-            customer_name = "Valued Client"  # Updated to match the formal greeting
+            # Create personalized greeting
+            if title and lastname:
+                greeting = f"{title} {lastname}"
+            elif lastname:
+                greeting = f"Mr./Ms. {lastname}"
+            else:
+                greeting = "Valued Client"
+            
+            print(f"📝 Personalizing email for: {greeting} (Policy: {policy_lookup})")
             
             # Create dynamic subject line with policy number
             email_subject = SUBJECT_TEMPLATE.format(policy_number=policy_lookup)
             
             # Prepare email content (both HTML and text versions)
             email_content_html = EMAIL_TEMPLATE_HTML.format(
-                customer_name=customer_name,
+                greeting=greeting,
                 policy_number=policy_lookup,
                 sender_name=SENDER_NAME
             )
             
             email_content_text = EMAIL_TEMPLATE_TEXT.format(
-                customer_name=customer_name,
+                greeting=greeting,
                 policy_number=policy_lookup,
                 sender_name=SENDER_NAME
             )
@@ -261,6 +304,15 @@ NIC - Serving you, Serving the Nation
             api_response = api_instance.send_transac_email(send_smtp_email)
             print(f"✅ Sent to {recipient_email} - Policy: {policy_lookup}")
             sent_count += 1
+            
+            # Track success
+            email_results.append({
+                'email': recipient_email,
+                'policy': policy_lookup,
+                'status': 'Success',
+                'timestamp': time.strftime("%H:%M:%S"),
+                'details': 'Email sent successfully'
+            })
             
             # Rate limiting - Brevo free tier has limits
             time.sleep(0.1)  # Small delay between emails
@@ -288,11 +340,39 @@ NIC - Serving you, Serving the Nation
             failed_count += 1
             failed_policies.append(policy_lookup)
             
+            # Track failure
+            email_results.append({
+                'email': recipient_email,
+                'policy': policy_lookup,
+                'status': 'Failed',
+                'timestamp': time.strftime("%H:%M:%S"),
+                'details': error_reason
+            })
+            
         except Exception as e:
             print(f"❌ Unexpected error for policy {policy_lookup} - Email: {recipient_email}")
             print(f"   Reason: {str(e)}")
             failed_count += 1
             failed_policies.append(policy_lookup)
+            
+            # Track unexpected error
+            email_results.append({
+                'email': recipient_email,
+                'policy': policy_lookup,
+                'status': 'Failed',
+                'timestamp': time.strftime("%H:%M:%S"),
+                'details': f"Unexpected error: {str(e)}"
+            })
+    
+    # Save results to file for the main app to read
+    import json
+    results_file = TEMP_PATH / "email_results.json"
+    try:
+        with open(results_file, 'w') as f:
+            json.dump(email_results, f, indent=2)
+        print(f"📁 Results saved to {results_file}")
+    except Exception as e:
+        print(f"⚠️ Could not save results file: {e}")
     
     # Final summary
     print(f"\n🎉 EMAIL SENDING COMPLETED!")
@@ -333,10 +413,10 @@ NEXT STEPS:
 - Monitor bounce rates and spam reports
 """
     
-    with open("/var/www/cashback/storage/email_sending_report.txt", "w") as f:
+    with open("email_sending_report.txt", "w") as f:
         f.write(report_content)
     
-    print(f"\n📄 Detailed report saved to: /var/www/cashback/storage/email_sending_report.txt")
+    print(f"\n📄 Detailed report saved to: email_sending_report.txt")
 
 def install_requirements():
     """Install required packages"""
