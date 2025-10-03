@@ -44,7 +44,7 @@ def merge_all_pdfs():
     
     try:
         # Use PdfFileMerger for robust merging
-        merger = PyPDF2.PdfFileMerger()
+        merger = PyPDF2.PdfMerger()
         
         successful_merges = 0
         

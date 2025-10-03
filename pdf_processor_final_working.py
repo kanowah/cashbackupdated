@@ -25,13 +25,21 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
     """Process uploaded PDF and Excel files"""
     
     # Save uploaded files to current directory
-    pdf_path = "temp_uploaded.pdf"
-    excel_path = "temp_uploaded.xlsx"
+    pdf_path = "/var/www/cashback/temp/temp_uploaded.pdf"
+    excel_path = "/var/www/cashback/temp/temp_uploaded.xlsx"
     
     with open(pdf_path, "wb") as f:
         f.write(pdf_file.getvalue())
     
     with open(excel_path, "wb") as f:
+        f.write(excel_file.getvalue())
+    
+    # Also save a permanent copy for email sending
+    permanent_excel_dir = "/var/www/cashback/storage/uploaded_files"
+    os.makedirs(permanent_excel_dir, exist_ok=True)
+    permanent_excel_path = os.path.join(permanent_excel_dir, "latest_excel.xlsx")
+    
+    with open(permanent_excel_path, "wb") as f:
         f.write(excel_file.getvalue())
     
     # Read Excel data
@@ -61,14 +69,14 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
         return None
     
     # Create output directories and clean old files
-    os.makedirs("policies_with_email", exist_ok=True)
-    os.makedirs("policies_without_email", exist_ok=True)
+    os.makedirs("/var/www/cashback/storage/generated_pdfs/with_email", exist_ok=True)
+    os.makedirs("/var/www/cashback/storage/generated_pdfs/without_email", exist_ok=True)
     
     # Clean old PDF files from previous sessions
     import glob
-    for old_file in glob.glob("policies_with_email/*.pdf"):
+    for old_file in glob.glob("/var/www/cashback/storage/generated_pdfs/with_email/*.pdf"):
         os.remove(old_file)
-    for old_file in glob.glob("policies_without_email/*.pdf"):
+    for old_file in glob.glob("/var/www/cashback/storage/generated_pdfs/without_email/*.pdf"):
         os.remove(old_file)
     
     st.info("🧹 Cleaned old PDF files from previous sessions")
@@ -132,8 +140,8 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
             pass
     
     # Count results
-    policies_with_email = len(list(Path("policies_with_email").glob("*.pdf")))
-    policies_without_email = len(list(Path("policies_without_email").glob("*.pdf")))
+    policies_with_email = len(list(Path("/var/www/cashback/storage/generated_pdfs/with_email").glob("*.pdf")))
+    policies_without_email = len(list(Path("/var/www/cashback/storage/generated_pdfs/without_email").glob("*.pdf")))
     
     status_text.text("✅ Processing completed!")
     progress_bar.progress(1.0)
@@ -224,7 +232,7 @@ def save_policy_pdf(pdf_reader, page_numbers, policy_number, df):
         st.warning(f"⚠️ Policy {policy_number} has email but no NIC for password protection")
     
     # Save to appropriate folder
-    folder = "policies_with_email" if has_email else "policies_without_email"
+    folder = "/var/www/cashback/storage/generated_pdfs/with_email" if has_email else "/var/www/cashback/storage/generated_pdfs/without_email"
     # Replace invalid filename characters
     safe_policy_number = policy_number.replace('/', '_').replace('\\', '_')
     filename = f"{safe_policy_number}.pdf"
@@ -263,7 +271,7 @@ def check_excel_file_exists():
 def check_pdf_files_exist():
     """Check if PDF files exist for email sending"""
     pdf_locations = [
-        "policies_with_email",
+        "/var/www/cashback/storage/generated_pdfs/with_email",
         "storage/generated_pdfs/with_email"
     ]
     
@@ -277,7 +285,7 @@ def check_pdf_files_exist():
 def check_pdf_files_without_email():
     """Check if PDF files exist without email addresses (for printing)"""
     pdf_locations = [
-        "policies_without_email",
+        "/var/www/cashback/storage/generated_pdfs/without_email",
         "storage/generated_pdfs/without_email"
     ]
     
@@ -613,7 +621,7 @@ def merge_pdfs_for_printing():
     try:
         # Find the correct input folder
         input_folders = [
-            "policies_without_email",
+            "/var/www/cashback/storage/generated_pdfs/without_email",
             "storage/generated_pdfs/without_email"
         ]
         
@@ -629,7 +637,7 @@ def merge_pdfs_for_printing():
             st.error("❌ No PDFs without email addresses found")
             return
         
-        output_file = "policies_for_printing.pdf"
+        output_file = "/var/www/cashback/storage/policies_for_printing.pdf"
         
         status_placeholder.info("🔍 Scanning PDF files...")
         
@@ -657,7 +665,7 @@ def merge_pdfs_for_printing():
         progress_placeholder.progress(0, "Starting PDF merge...")
         
         # Use PyPDF2 PdfFileMerger for robust merging
-        merger = PyPDF2.PdfFileMerger()
+        merger = PyPDF2.PdfMerger()
         successful_merges = 0
         failed_files = []
         
@@ -812,7 +820,7 @@ def main():
                 st.session_state.processing_done = True
                 
                 # Force rerun to show results
-                st.experimental_rerun()
+                st.rerun()
     
     # Results section - ALWAYS show if we have results in session state
     if st.session_state.results:
@@ -837,7 +845,7 @@ def main():
         
         with col1:
             if results['with_email'] > 0:
-                zip_data = create_download_zip("policies_with_email", "policies_with_email.zip")
+                zip_data = create_download_zip("/var/www/cashback/storage/generated_pdfs/with_email", "policies_with_email.zip")
                 st.download_button(
                     label="📧 Download Policies WITH Email",
                     data=zip_data,
@@ -848,7 +856,7 @@ def main():
         
         with col2:
             if results['without_email'] > 0:
-                zip_data = create_download_zip("policies_without_email", "policies_without_email.zip")
+                zip_data = create_download_zip("/var/www/cashback/storage/generated_pdfs/without_email", "policies_without_email.zip")
                 st.download_button(
                     label="❓ Download Policies WITHOUT Email",
                     data=zip_data,
@@ -867,7 +875,7 @@ def main():
             # Clear session state
             st.session_state.results = None
             st.session_state.processing_done = False
-            st.experimental_rerun()
+            st.rerun()
     
     elif pdf_file and excel_file:
         st.info("👆 Click 'Process Files' to extract policies")

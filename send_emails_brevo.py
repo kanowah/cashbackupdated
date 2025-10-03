@@ -154,16 +154,28 @@ NIC - Serving you, Serving the Nation
     
     # Read Excel file to get policy-email mapping
     try:
-        df = pd.read_excel("Compile CBOpt Nov25.xlsx")
+        # Try multiple Excel file locations
+        excel_files = [
+            "Compile CBOpt Nov25.xlsx",
+            "/var/www/cashback/storage/uploaded_files/latest_excel.xlsx"
+        ]
+        df = None
+        for excel_file in excel_files:
+            if os.path.exists(excel_file):
+                df = pd.read_excel(excel_file)
+                print(f"📊 Using Excel file: {excel_file}")
+                break
+        if df is None:
+            df = pd.read_excel("Compile CBOpt Nov25.xlsx")  # fallback
         print(f"📊 Loaded {len(df)} policies from Excel")
     except Exception as e:
         print(f"❌ Error reading Excel file: {e}")
         return
     
-    # Check if policies_with_email folder exists
-    pdf_folder = Path("policies_with_email")
+    # Check if /var/www/cashback/storage/generated_pdfs/with_email folder exists
+    pdf_folder = Path("/var/www/cashback/storage/generated_pdfs/with_email")
     if not pdf_folder.exists():
-        print("❌ 'policies_with_email' folder not found. Run create_complete_analysis.py first.")
+        print("❌ '/var/www/cashback/storage/generated_pdfs/with_email' folder not found. Run create_complete_analysis.py first.")
         return
     
     # Get list of available PDF files
@@ -321,10 +333,10 @@ NEXT STEPS:
 - Monitor bounce rates and spam reports
 """
     
-    with open("email_sending_report.txt", "w") as f:
+    with open("/var/www/cashback/storage/email_sending_report.txt", "w") as f:
         f.write(report_content)
     
-    print(f"\n📄 Detailed report saved to: email_sending_report.txt")
+    print(f"\n📄 Detailed report saved to: /var/www/cashback/storage/email_sending_report.txt")
 
 def install_requirements():
     """Install required packages"""
