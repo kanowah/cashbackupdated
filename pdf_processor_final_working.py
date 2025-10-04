@@ -495,15 +495,18 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
         st.error(f"❌ Error reading PDF file: {e}")
         return None
     
-    # Create output directories and clean old files
-    os.makedirs("policies_with_email", exist_ok=True)
-    os.makedirs("policies_without_email", exist_ok=True)
+    # Create output directories using storage paths
+    with_email_dir = STORAGE_PATH / "generated_pdfs" / "with_email"
+    without_email_dir = STORAGE_PATH / "generated_pdfs" / "without_email"
+    
+    with_email_dir.mkdir(parents=True, exist_ok=True)
+    without_email_dir.mkdir(parents=True, exist_ok=True)
     
     # Clean old PDF files from previous sessions
     import glob
-    for old_file in glob.glob("policies_with_email/*.pdf"):
+    for old_file in glob.glob(str(with_email_dir / "*.pdf")):
         os.remove(old_file)
-    for old_file in glob.glob("policies_without_email/*.pdf"):
+    for old_file in glob.glob(str(without_email_dir / "*.pdf")):
         os.remove(old_file)
     
     st.info("🧹 Cleaned old PDF files from previous sessions")
@@ -567,8 +570,8 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
             pass
     
     # Count results
-    policies_with_email = len(list(Path("policies_with_email").glob("*.pdf")))
-    policies_without_email = len(list(Path("policies_without_email").glob("*.pdf")))
+    policies_with_email = len(list(with_email_dir.glob("*.pdf")))
+    policies_without_email = len(list(without_email_dir.glob("*.pdf")))
     
     status_text.text("✅ Processing completed!")
     progress_bar.progress(1.0)
@@ -659,7 +662,7 @@ def save_policy_pdf(pdf_reader, page_numbers, policy_number, df):
         st.warning(f"⚠️ Policy {policy_number} has email but no NIC for password protection")
     
     # Save to appropriate folder
-    folder = "policies_with_email" if has_email else "policies_without_email"
+    folder = with_email_dir if has_email else without_email_dir
     # Replace invalid filename characters
     safe_policy_number = policy_number.replace('/', '_').replace('\\', '_')
     filename = f"{safe_policy_number}.pdf"
@@ -1166,8 +1169,8 @@ def merge_pdfs_for_printing():
     try:
         # Find the correct input folder
         input_folders = [
-            "policies_without_email",
-            "storage/generated_pdfs/without_email"
+            "policies_without_email",  # Legacy folder
+            str(STORAGE_PATH / "generated_pdfs" / "without_email")
         ]
         
         input_folder = None
@@ -1433,7 +1436,7 @@ def main():
         
         with col1:
             if results['with_email'] > 0:
-                zip_data = create_download_zip("policies_with_email", "policies_with_email.zip")
+                zip_data = create_download_zip(str(STORAGE_PATH / "generated_pdfs" / "with_email"), "policies_with_email.zip")
                 st.download_button(
                     label="📧 Download Policies WITH Email",
                     data=zip_data,
@@ -1444,7 +1447,7 @@ def main():
         
         with col2:
             if results['without_email'] > 0:
-                zip_data = create_download_zip("policies_without_email", "policies_without_email.zip")
+                zip_data = create_download_zip(str(STORAGE_PATH / "generated_pdfs" / "without_email"), "policies_without_email.zip")
                 st.download_button(
                     label="❓ Download Policies WITHOUT Email",
                     data=zip_data,
