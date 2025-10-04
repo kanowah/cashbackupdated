@@ -1419,7 +1419,10 @@ def main():
                 st.session_state.processing_done = True
                 
                 # Force rerun to show results
-                st.experimental_rerun()
+                try:
+                    st.rerun()
+                except AttributeError:
+                    st.experimental_rerun()
     
     # Results section - ALWAYS show if we have results in session state
     if st.session_state.results:
@@ -1474,7 +1477,10 @@ def main():
             # Clear session state
             st.session_state.results = None
             st.session_state.processing_done = False
-            st.experimental_rerun()
+            try:
+                st.rerun()
+            except AttributeError:
+                st.experimental_rerun()
     
     elif pdf_file and excel_file:
         st.info("👆 Click 'Process Files' to extract policies")
