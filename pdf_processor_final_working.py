@@ -8,6 +8,14 @@ import time
 from pathlib import Path
 from io import BytesIO
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without it
+    pass
+
 # Environment detection and path setup
 def get_base_paths():
     """Get appropriate paths based on environment"""
