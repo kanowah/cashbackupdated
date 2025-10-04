@@ -413,10 +413,12 @@ NEXT STEPS:
 - Monitor bounce rates and spam reports
 """
     
-    with open("email_sending_report.txt", "w") as f:
+    # Save report to storage directory
+    report_file = STORAGE_PATH / "email_sending_report.txt"
+    with open(report_file, "w") as f:
         f.write(report_content)
     
-    print(f"\n📄 Detailed report saved to: email_sending_report.txt")
+    print(f"\n📄 Detailed report saved to: {report_file}")
 
 def install_requirements():
     """Install required packages"""
