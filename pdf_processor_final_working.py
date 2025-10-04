@@ -324,7 +324,7 @@ def show_authentication():
             st.markdown("<br>", unsafe_allow_html=True)
             
             # Verify button
-            if st.button("✅ Verify & Access System", type="primary", use_container_width=True):
+            if st.button("✅ Verify & Access System", type="primary", use_container_width=True, key="verify_otp_main"):
                 if not entered_otp:
                     st.markdown("""
                     <div style="background: #f44336; color: white; padding: 0.5rem; 
@@ -383,7 +383,7 @@ def show_authentication():
             st.markdown("<br>", unsafe_allow_html=True)
             
             # Verify button
-            if st.button("✅ Verify & Access System", type="primary", use_container_width=True):
+            if st.button("✅ Verify & Access System", type="primary", use_container_width=True, key="verify_otp_expired"):
                 if not entered_otp:
                     st.markdown("""
                     <div style="background: #f44336; color: white; padding: 0.5rem; 
