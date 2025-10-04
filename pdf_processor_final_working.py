@@ -563,7 +563,7 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
             progress_bar.progress(0.5 + (policies_found + 1) / (len(policy_pages) * 2))  # Second half
             status_text.text(f"💾 Creating PDF for policy {policy_number} ({len(pages)} pages)")
             
-            save_policy_pdf(pdf_reader, pages, policy_number, df)
+            save_policy_pdf(pdf_reader, pages, policy_number, df, with_email_dir, without_email_dir)
             policies_found += 1
         
     finally:
@@ -590,7 +590,7 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
         'without_email': policies_without_email
     }
 
-def save_policy_pdf(pdf_reader, page_numbers, policy_number, df):
+def save_policy_pdf(pdf_reader, page_numbers, policy_number, df, with_email_dir, without_email_dir):
     """Save individual policy as PDF with password protection"""
     
     # Check if policy has email and NIC
