@@ -467,9 +467,14 @@ if 'generated_otp' not in st.session_state:
 def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
     """Process uploaded PDF and Excel files"""
     
-    # Save uploaded files to temp directory
-    pdf_path = TEMP_PATH / "temp_uploaded.pdf"
-    excel_path = TEMP_PATH / "temp_uploaded.xlsx"
+    # Clear Streamlit cache to ensure fresh processing
+    st.cache_data.clear()
+    
+    # Save uploaded files to temp directory with timestamp to avoid caching
+    import time
+    timestamp = int(time.time())
+    pdf_path = TEMP_PATH / f"temp_uploaded_{timestamp}.pdf"
+    excel_path = TEMP_PATH / f"temp_uploaded_{timestamp}.xlsx"
     
     with open(pdf_path, "wb") as f:
         f.write(pdf_file.getvalue())
@@ -1364,6 +1369,22 @@ def main():
         </p>
     </div>
     """.format(st.session_state.auth_email), unsafe_allow_html=True)
+    
+    # Add cache clearing button for production issues
+    if st.sidebar.button("🔄 Clear Cache", help="Clear app cache if experiencing issues"):
+        st.cache_data.clear()
+        # Clear temp files
+        import glob
+        for temp_file in glob.glob(str(TEMP_PATH / "temp_uploaded_*")):
+            try:
+                os.remove(temp_file)
+            except:
+                pass
+        st.sidebar.success("✅ Cache cleared!")
+        try:
+            st.rerun()
+        except AttributeError:
+            st.experimental_rerun()
     
     if st.sidebar.button("🚪 Secure Logout", use_container_width=True):
         st.session_state.authenticated = False
