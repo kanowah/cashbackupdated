@@ -468,19 +468,34 @@ def process_uploaded_files(pdf_file, excel_file, progress_bar, status_text):
     """Process uploaded PDF and Excel files"""
     
     # Clear Streamlit cache to ensure fresh processing
-    st.cache_data.clear()
+    try:
+        st.cache_data.clear()
+    except:
+        pass
     
-    # Save uploaded files to temp directory with timestamp to avoid caching
-    import time
-    timestamp = int(time.time())
-    pdf_path = TEMP_PATH / f"temp_uploaded_{timestamp}.pdf"
-    excel_path = TEMP_PATH / f"temp_uploaded_{timestamp}.xlsx"
+    # Save uploaded files to temp directory (overwrite existing)
+    pdf_path = TEMP_PATH / "temp_uploaded.pdf"
+    excel_path = TEMP_PATH / "temp_uploaded.xlsx"
+    
+    # Remove existing files first to ensure fresh upload
+    try:
+        if pdf_path.exists():
+            pdf_path.unlink()
+        if excel_path.exists():
+            excel_path.unlink()
+    except:
+        pass
     
     with open(pdf_path, "wb") as f:
         f.write(pdf_file.getvalue())
     
     with open(excel_path, "wb") as f:
         f.write(excel_file.getvalue())
+    
+    # Debug: Confirm file was saved
+    st.info(f"📁 Excel file saved to: {excel_path}")
+    st.info(f"📁 File exists: {excel_path.exists()}")
+    st.info(f"📁 File size: {excel_path.stat().st_size if excel_path.exists() else 'N/A'} bytes")
     
     # Read Excel data
     try:
