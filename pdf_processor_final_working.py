@@ -62,6 +62,12 @@ def send_otp_email(email, otp):
         import sib_api_v3_sdk
         from sib_api_v3_sdk.rest import ApiException
         
+        # Validate email parameter
+        if not email or not email.strip():
+            return False, "Email address is empty or invalid"
+        
+        email = email.strip()  # Clean the email
+        
         # Get API key
         BREVO_API_KEY = os.getenv('BREVO_API_KEY')
         if not BREVO_API_KEY:
@@ -217,45 +223,49 @@ def show_authentication():
             
             if auth_method == "🔐 Email OTP (Recommended)":
                 if st.button("🚀 Send Authentication Code", type="primary", use_container_width=True):
-                 if not email:
-                    st.error("❌ Please enter your email address")
-                 elif email.lower().strip() not in [e.lower() for e in AUTHORIZED_EMAILS]:
-                    st.error("❌ Access Denied: Your email address is not authorized to use this system")
-                    st.info("📞 Contact IT support if you believe this is an error")
-                else:
-                # Generate and send OTP
-                 otp = generate_otp()
-                 success, message = send_otp_email(email, otp)
-                
-                if success:
-                    st.session_state.generated_otp = otp
-                    st.session_state.auth_email = email.lower().strip()
-                    st.session_state.otp_sent = True
-                    st.session_state.otp_timestamp = time.time()
-                    
-                    # Enhanced success message
-                    st.markdown("""
-                    <div style="background: linear-gradient(90deg, #4CAF50, #45a049); 
-                                color: white; padding: 1rem; border-radius: 10px; 
-                                text-align: center; margin: 1rem 0;">
-                        <h4 style="margin: 0;">✅ Authentication Code Sent!</h4>
-                        <p style="margin: 0.5rem 0;">Check your email for the 6-digit verification code</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    try:
-                        st.rerun()
-                    except AttributeError:
-                        st.experimental_rerun()
-                else:
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(90deg, #f44336, #d32f2f); 
-                                color: white; padding: 1rem; border-radius: 10px; 
-                                text-align: center; margin: 1rem 0;">
-                        <h4 style="margin: 0;">❌ Authentication Failed</h4>
-                        <p style="margin: 0.5rem 0;">{message}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    if not email:
+                        st.error("❌ Please enter your email address")
+                    elif email.lower().strip() not in [e.lower() for e in AUTHORIZED_EMAILS]:
+                        st.error("❌ Access Denied: Your email address is not authorized to use this system")
+                        st.info("📞 Contact IT support if you believe this is an error")
+                    else:
+                        # Generate and send OTP
+                        otp = generate_otp()
+                        
+                        # Debug: Show what email is being used
+                        st.info(f"🔍 Debug: Sending OTP to '{email}' (length: {len(email) if email else 0})")
+                        
+                        success, message = send_otp_email(email, otp)
+                        
+                        if success:
+                            st.session_state.generated_otp = otp
+                            st.session_state.auth_email = email.lower().strip()
+                            st.session_state.otp_sent = True
+                            st.session_state.otp_timestamp = time.time()
+                            
+                            # Enhanced success message
+                            st.markdown("""
+                            <div style="background: linear-gradient(90deg, #4CAF50, #45a049); 
+                                        color: white; padding: 1rem; border-radius: 10px; 
+                                        text-align: center; margin: 1rem 0;">
+                                <h4 style="margin: 0;">✅ Authentication Code Sent!</h4>
+                                <p style="margin: 0.5rem 0;">Check your email for the 6-digit verification code</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            try:
+                                st.rerun()
+                            except AttributeError:
+                                st.experimental_rerun()
+                        else:
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(90deg, #f44336, #d32f2f); 
+                                        color: white; padding: 1rem; border-radius: 10px; 
+                                        text-align: center; margin: 1rem 0;">
+                                <h4 style="margin: 0;">❌ Authentication Failed</h4>
+                                <p style="margin: 0.5rem 0;">{message}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
             
             else:  # Backup Password method
                 st.markdown("<br>", unsafe_allow_html=True)
