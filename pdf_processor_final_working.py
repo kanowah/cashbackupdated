@@ -48,6 +48,9 @@ AUTHORIZED_EMAILS = [
     "vikas.khanna@zwennpay.com"
 ]
 
+# Backup password for all authorized users
+BACKUP_PASSWORD = "NICL@2025"
+
 def generate_otp():
     """Generate a 6-digit OTP"""
     import random
@@ -205,10 +208,18 @@ def show_authentication():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("🚀 Send Authentication Code", type="primary", use_container_width=True):
-                if not email:
+            # Authentication method selection
+            auth_method = st.radio(
+                "Choose Authentication Method:",
+                ["🔐 Email OTP (Recommended)", "🔑 Backup Password"],
+                help="OTP is more secure, but password is available as backup"
+            )
+            
+            if auth_method == "🔐 Email OTP (Recommended)":
+                if st.button("🚀 Send Authentication Code", type="primary", use_container_width=True):
+                 if not email:
                     st.error("❌ Please enter your email address")
-                elif email.lower().strip() not in [e.lower() for e in AUTHORIZED_EMAILS]:
+                 elif email.lower().strip() not in [e.lower() for e in AUTHORIZED_EMAILS]:
                     st.error("❌ Access Denied: Your email address is not authorized to use this system")
                     st.info("📞 Contact IT support if you believe this is an error")
                 else:
@@ -245,6 +256,54 @@ def show_authentication():
                         <p style="margin: 0.5rem 0;">{message}</p>
                     </div>
                     """, unsafe_allow_html=True)
+            
+            else:  # Backup Password method
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                password = st.text_input(
+                    "Backup Password",
+                    type="password",
+                    placeholder="Enter backup password",
+                    help="Use the backup password provided by IT",
+                    key="backup_password_input"
+                )
+                
+                if st.button("🔑 Login with Password", type="secondary", use_container_width=True):
+                    if not email:
+                        st.error("❌ Please enter your email address")
+                    elif email.lower().strip() not in [e.lower() for e in AUTHORIZED_EMAILS]:
+                        st.error("❌ Access Denied: Your email address is not authorized to use this system")
+                        st.info("📞 Contact IT support if you believe this is an error")
+                    elif not password:
+                        st.error("❌ Please enter the backup password")
+                    elif password == BACKUP_PASSWORD:
+                        # Successful password authentication
+                        st.session_state.authenticated = True
+                        st.session_state.auth_email = email.lower().strip()
+                        st.session_state.auth_timestamp = time.time()
+                        
+                        st.markdown("""
+                        <div style="background: linear-gradient(90deg, #4CAF50, #45a049); 
+                                    color: white; padding: 1rem; border-radius: 10px; 
+                                    text-align: center; margin: 1rem 0;">
+                            <h3 style="margin: 0;">🎉 Password Authentication Successful!</h3>
+                            <p style="margin: 0.5rem 0;">Welcome to NIC Policy Processor</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.balloons()
+                        time.sleep(1)
+                        try:
+                            st.rerun()
+                        except AttributeError:
+                            st.experimental_rerun()
+                    else:
+                        st.markdown("""
+                        <div style="background: #f44336; color: white; padding: 0.5rem; 
+                                    border-radius: 5px; text-align: center; margin: 0.5rem 0;">
+                            ❌ Invalid password. Please try again or use OTP authentication.
+                        </div>
+                        """, unsafe_allow_html=True)
     
     else:
         # Step 2: OTP verification with enhanced styling
