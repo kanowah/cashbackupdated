@@ -45,7 +45,8 @@ BASE_PATH, STORAGE_PATH, TEMP_PATH = get_base_paths()
 AUTHORIZED_EMAILS = [
     "nbeesoo@nicl.mu",
     "skhodabux@nicl.mu", 
-    "vikas.khanna@zwennpay.com"
+    "vikas.khanna@zwennpay.com",
+    "kanowah1994@gmail.com"
 ]
 
 # Backup password for all authorized users
